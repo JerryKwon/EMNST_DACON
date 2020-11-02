@@ -12,7 +12,7 @@ from torch import optim
 from torchvision import transforms
 
 from dataset_loader import DatasetLoader
-from emnst_dataset import EMNST_Dataset
+from emnst_dataset import EMNST_Dataset, EMNST_Test_Dataset
 from model import CustomCNN
 from evalutaor import Evaluator
 
@@ -38,27 +38,28 @@ def main():
     warnings.filterwarnings("ignore")
 
     parser = argparse.ArgumentParser(description="excute inference.py")
-    parser.add_argument('--is_generate', type=str2bool,
+    parser.add_argument('--is_generated', type=str2bool,
                         help='Whether Generating Splited Dataset using train / test.csv')
-    parser.add_arguments('--n_folds', type=int, help='Number of Split folds on train dataset')
-    # parser.add_argument('--output', type=output_type, help='Dataset what getting prediction')
+    parser.add_argument('--n_folds', type=int, help='Number of Split folds on train dataset')
+    parser.add_argument('--output', type=output_type, help='Dataset what getting prediction')
     parser.add_argument('--epochs', type=int, help='EPOCH size for DL')
     parser.add_argument('--batch_size', type=int, help='BATCH size for DL')
+    parser.add_argument('--use_pretrained', type=str2bool, help="using pretrained model for training")
     parser.add_argument('--predict_file', type=str, help='filename for final prediction')
 
+    args = parser.parse_args()
 
-    args = parser.parse.args()
-
-    is_generate = args.is_generate
+    is_generated = args.is_generated
     n_folds = args.n_folds
-    # output = args.output
+    output = str(args.output)
     EPOCHS = args.epochs
     BATCH_SIZE = args.batch_size
+    USE_PRETRAINED = args.use_pretrained
     RESULT_FILENAME = args.predict_file
 
     loader = DatasetLoader()
 
-    if not is_generate:
+    if not is_generated:
         loader.split(n_folds)
 
     trn_dict, val_dict, test_dict = loader.load_split(n_folds)
@@ -80,7 +81,7 @@ def main():
 
     train_dataset = EMNST_Dataset(img_dict=trn_dict, img_width=28, img_height=28, transform=train_transforms)
     valid_dataset = EMNST_Dataset(img_dict=val_dict, img_width=28, img_height=28, transform=valid_transforms)
-    test_dataset = EMNST_Dataset(img_dict=test_dict, img_width=28, img_height=28, transform=valid_transforms)
+    test_dataset = EMNST_Test_Dataset(img_dict=test_dict, img_width=28, img_height=28, transform=valid_transforms)
 
     train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
     valid_loader = DataLoader(valid_dataset, batch_size=BATCH_SIZE, shuffle=False)
@@ -92,32 +93,53 @@ def main():
     model = CustomCNN()
     criterion = nn.CrossEntropyLoss()
     learning_rate = 0.001
-    optimizer = optim(model.parameters(),learning_rate)
+    optimizer = optim.Adam(model.parameters(),lr=learning_rate)
 
-    evaluator = Evaluator(model, criterion, optimizer)
+    evaluator = Evaluator(criterion, optimizer)
 
-    best_loss = np.inf()
     model_path = os.path.join(loader.get_basepath(),'output','models')
 
     if not os.path.isdir(model_path):
         os.mkdir(model_path)
 
-    model_state_file = os.path.join(model_path,'EMNST_CNN.pt')
+    model_state_file = os.path.join(model_path, 'EMNST_CNN.pt')
+    model_val_loss_file = os.path.join(model_path, 'EMNST_CNN_SCORE.txt')
 
-    if os.path.isfile(model_state_file):
-        model.load_state_dict(torch.load(model_state_file))
+    if USE_PRETRAINED:
+        if os.path.isfile(model_state_file):
+            model.load_state_dict(torch.load(model_state_file))
+            with open(model_val_loss_file, 'r') as f:
+                best_loss_init = float(f.read())
+                best_loss = best_loss_init
+
+    else:
+        best_loss_init = np.inf
+        best_loss = best_loss_init
 
     for epoch in range(EPOCHS):
-        train_loss, valid_loss, train_acc, valid_acc = evaluator.train(model,train_loader, valid_loader, optimizer, criterion)
+        train_loss, valid_loss, train_acc, valid_acc = evaluator.train(model, train_loader, valid_loader)
         if valid_loss < best_loss:
+            print("valid_loss broken from {:.4f} to {:.4f}".format(best_loss,valid_loss))
             torch.save(model.state_dict(), model_state_file)
             best_loss = valid_loss
         print("epoch: {}/{} | trn loss: {:.4f} | val loss: {:.4f} | trn acc: {:.4f} | val acc: {:.4f}".format(
             epoch + 1, EPOCHS, train_loss, valid_loss,train_acc, valid_acc
         ))
 
-    target_loader = valid_loader if output == "valid" else test_loader
+    if best_loss < best_loss_init:
+        model.load_state_dict(torch.load(model_state_file))
+        with open(model_val_loss_file, 'w') as f:
+            f.write(str(best_loss.item()))
 
-    result_dict = evaluator.predict(model, target_loader,)
+    else:
+        model.load_state_dict(torch.load(model_state_file))
 
-    loader.submit(result_dict,RESULT_FILENAME)
+    if output == "valid":
+        result_dict = evaluator.predict(model=model, target_loader=valid_loader, output_type=output, val_dict=val_dict)
+    else:
+        result_dict = evaluator.predict(model=model, target_loader=test_loader)
+
+    loader.submit(result_dict,RESULT_FILENAME,output_type=output)
+
+if __name__ == '__main__':
+    main()
