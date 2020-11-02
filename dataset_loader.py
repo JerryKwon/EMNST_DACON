@@ -47,6 +47,8 @@ class DatasetLoader:
         for fold, (trn_idx, val_idx) in enumerate(kfold.split(X=df_train,y=df_train.digit)):
             df_train.loc[val_idx,"fold"] = fold
 
+        df_train.loc[:,"fold"]= df_train.fold.astype("int")
+
         self.make_folder(self.train_path)
         self.make_folder(self.test_path)
 
@@ -54,7 +56,7 @@ class DatasetLoader:
         df_test_imgs = df_test.loc[:,df_test.columns[2:]].values
 
         for fold in range(n_folds):
-            fold_path = os.path.join(self.train_path,f"{fold}")
+            fold_path = os.path.join(self.train_path,str(fold))
             self.make_folder(fold_path)
 
         print("Generating Local Train Dataset per image by fold", '*'*20)
@@ -66,7 +68,7 @@ class DatasetLoader:
             letter = df_train.loc[df_train.id==img_id, "letter"].values[0]
             img = df_train_imgs[idx,:]
 
-            target_path = os.path.join(os.path.join(self.train_path,f"{fold}"),"%d_%d_%c.pkl"%(img_id,digit,letter))
+            target_path = os.path.join(os.path.join(self.train_path,str(fold)),"%d_%d_%c.pkl"%(img_id,digit,letter))
 
             with open(target_path,'wb') as f:
                 pickle.dump(img,f)
@@ -87,7 +89,7 @@ class DatasetLoader:
         np.random.seed(101)
         val_fold = np.random.randint(5)
         trn_folds = [idx for idx in range(5) if idx != val_fold]
-        print("Valid fold is {val_fold} among {list(range(n_folds))}")
+        print(f"Valid fold is {val_fold} among {list(range(n_folds))}")
 
         trn_pattern = '[0-9]+_[0-9]_[A-Z]'
 
@@ -142,15 +144,25 @@ class DatasetLoader:
 
         return trn_dict, val_dict, test_dict
 
-    def submit(self, result_dict, filename):
+    def submit(self, result_dict, filename,output_type="test"):
         base_path = self.get_basepath()
-        submission = pd.read_csv(os.path.join(self.data_path,'submission.csv'))
-        submission.loc[:,"digit"] = submission.id.apply(lambda x: result_dict[x])
-
         result_path = os.path.join(base_path, 'output', 'results')
-        submission.to_csv(os.path.join(result_path,f'{filename}.csv'),index=False)
+        result_file_path = os.path.join(result_path, f'{filename}')
 
-        print(f"submission file {filename} is created At {result_path}")
+        if output_type == "valid":
+            submission = pd.DataFrame.from_dict(result_dict,orient='index')
+            submission = submission.reset_index()
+            submission.columns = ["id","digit"]
+            submission.loc[:,"id"] = submission.id.astype("int")
+            submission = submission.sort_values(by="id")
+
+        else:
+            submission = pd.read_csv(os.path.join(self.data_path,'submission.csv'))
+            submission.loc[:,"digit"] = submission.id.apply(lambda x: result_dict[x])
+
+        submission.to_csv((result_file_path), index=False)
+
+        print(f"submission file {filename} is created At {result_file_path}")
 
     def make_folder(self, path):
         is_dir = os.path.isdir(path)
