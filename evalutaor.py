@@ -2,20 +2,26 @@
 # trainning, evaluating CNN model
 
 import torch
+import numpy as np
+from tqdm import tqdm
 
 class Evaluator:
-    def __init__(self, model, criterion, optimizer):
-        self.model = model
+    def __init__(self, criterion, optimizer):
         self.criterion = criterion
         self.optimizer = optimizer
 
-    def train(self, train_loader, valid_loader):
+    def train(self, model, train_loader, valid_loader):
         DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
         if DEVICE == "cuda":
-            model = self.model.to(DEVICE)
+            model = model.to(DEVICE)
 
         trn_loss = 0.0
         trn_corrects = 0
+
+        # itr_loader = iter(valid_loader)
+        # data = next(itr_loader)
+        # print(data)
 
         model.train()
         for batch_num, (inputs, labels) in enumerate(train_loader):
@@ -68,21 +74,52 @@ class Evaluator:
 
         return trn_loss, val_loss, trn_acc, val_acc
 
-    def predict(self, model, test_loader):
+    def predict(self, model, target_loader, output_type='test', val_dict=None):
+
+        DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+        if DEVICE == "cuda":
+            model = model.to(DEVICE)
+
         result_dict = dict()
 
         model.eval()
         with torch.no_grad():
+            if output_type == 'valid':
 
-            for inputs,ids in test_loader:
+                assert val_dict is not None
 
-                outputs = model(inputs)
-                preds = torch.argmax(outputs,1)
+                ids = list(map(lambda x:x["img_id"],list(val_dict.values())))
+                target_batch_size = target_loader.batch_size
+                ids_per_batch = list(self.chunks(ids,target_batch_size))
 
-                ids = ids.data.numpy()
-                preds = preds.data.numpy()
+                print("Valid Prediction Processing", "*" * 20)
+                for batch_num, (inputs,labels) in enumerate(tqdm(target_loader)):
+                    outputs = model(inputs)
+                    preds = torch.argmax(outputs, 1)
 
-                for idx, id in enumerate(ids):
-                    result_dict[id] = preds[idx]
+                    batch_ids = np.array(ids_per_batch[batch_num])
+                    preds = preds.data.numpy()
 
-        return result_dict
+                    for idx, id in enumerate(batch_ids):
+                        result_dict[id] = preds[idx]
+
+            else:
+                print("Test Prediction Processing","*"*20)
+                for inputs,ids in tqdm(target_loader):
+
+                    outputs = model(inputs)
+                    preds = torch.argmax(outputs,1)
+
+                    ids = ids.data.numpy()
+                    preds = preds.data.numpy()
+
+                    for idx, id in enumerate(ids):
+                        result_dict[id] = preds[idx]
+
+            return result_dict
+
+    def chunks(self, lst, n):
+        """Yield successive n-sized chunks from lst."""
+        for i in range(0, len(lst), n):
+            yield lst[i:i + n]
