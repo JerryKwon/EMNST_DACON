@@ -25,7 +25,7 @@ class EMNST_Dataset(Dataset):
         img = img_dict["img"].reshape(self.img_height, self.img_width)
         digit = img_dict["digit"]
         letter = img_dict["letter"]
-        img = img.astype("unit8")
+        img = img.astype("uint8")
 
         if self.transform is not None:
             img = self.transform(img)
@@ -46,10 +46,10 @@ class EMNST_Test_Dataset(Dataset):
 
     def __getitem__(self, index):
         img_dict = self.img_dict[index]
-        img_id = img_dict["img_id"]
+        img_id = int(img_dict["img_id"])
         img = img_dict["img"].reshape(self.img_height, self.img_width)
         letter = img_dict["letter"]
-        img = img.astype("unit8")
+        img = img.astype("uint8")
 
         if self.transform is not None:
             img = self.transform(img)
