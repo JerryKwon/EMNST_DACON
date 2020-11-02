@@ -63,10 +63,10 @@ https://dacon.io/competitions/official/235626/overview/
 <h3>사용 패키지</h3>
 
 * Python3 내장 패키지<br/>
-argparse, warnings, json, io, platform, os, collections<br/>
+argparse, warnings, io, platform, os<br/>
 * Python3 외장 패키지
     - 신경망 구축 및 학습/예측 수행 - pytorch, torchvision
-    - 데이터 조작 - pandas, numpy, sklearn, scipy <br/>
+    - 데이터 조작 - pandas, numpy, sklearn <br/>
     - 진행상황 모니터링 - tqdm <br/>
 
 <h3 id="how-to-execute">실행법</h3>
@@ -95,46 +95,45 @@ argparse, warnings, json, io, platform, os, collections<br/>
         : /output/results 아래에 예측 결과를 나타낼 csv 파일의 이름
     
 * train.py <br/>
-  **※ 주의** <br/>
-    **해당 프로젝트에서는 pytorch, tensorflow, keras등의 학습 모델 생성을 통한 예측을 진행하지 않기 때문에, inference.py 와 동일함.**
-  
     1. 설명 <br/>
       주어진 데이터를 활용하여 모델을 학습하는 python 파일 <br/>
-    
     2. 실행 <br/>
-      python train.py --model_type hybrid --is_valid True
+      python train.py --is_generated [True | False] --n_folds int --output [valid | test] --epochs int --batch_size int --get_pretrained [True | False] --use_pretrained [True | False] --model_file str
     3. 옵션
-        * --model_type - [icbf | hybrid] <br/>
-        : 예측을 수행할 모델의 타입을 결정하는 파라미터. <br/>
-            * icbf: 아이템 기반 협업 필터링 방식을 통한 Recommendation 진행
-            * hybrid: 아이템 기반 협업 필터링 + 컨텐츠기반 필터링 + 예외처리 방식을 통한 Recommendation 진행
-        * --is_valid - boolean [True | False] <br/>
-        : 예측을 수행할 데이터 타입을 결정하는 파라미터 <br/>
-            * True: /data/val.json을 대상으로 하여 Recommendation 진행
-            * False: /data/test.json을 대상으로 하여 Recommendation 진행
-    4. 수행시간
-        * --model_type = icbf +  --is_valid = True <br/>
-            : 약 40분 ~ 1시간
-        * --model_type = icbf +  --is_valid = False <br/>
-            : 약 30분 ~ 40분
-        * --model_type = hybrid +  --is_valid = True <br/>
-            : 약 40분 ~ 1시간
-        * --model_type = hybrid +  --is_valid = False <br/>
-            : 약 30분 ~ 40분
+        * --is_generated [True | False] <br/>
+        : /input/data 아래의 train / test img를 1장 당 별도로 분리한 데이터를 Local에 생성하였는지 여부 
+        * --n_folds int 
+        : Train 데이터을 몇 개의 데이터로 나눌 것인지 정의
+        * --output [valid | test] 
+        : 예측을 수행할 데이터셋을 결정
+            * valid: Train에서 지정될 임의의 fold인 Valid 데이터에 대해 예측 진행
+            * test: Test 데이터에 대해 예측 진행 
+        * --epochs int
+        : CNN 모델에 대해 학습 수행시 EPOCH의 수
+        * --batch_size int    
+        : CNN 모델에 대해 학습 수행시 BATCH의 수 
+        * --get_pretrained [True | False]
+        : /output/models 아래의 이전에 학습한 state_dict load하여 학습 없이 return 하는지 여부
+        * --use_pretrained [True | False]
+        : /output/models 아래의 이전에 학습한 state_dict를 사용하여 학습하는지 여부
+        * --model_file str
+        : /output/models 아래에 학습한 모델을 저장할 파일의 이름
+        
+        4. 수행시간
             
 <h3>결과 파일</h3>
 
-**/result 아래, '[valid | test]_[hybrid | icbf]_rcomm_result.json' 형태로 결과값이 반환됨.** <br/>
-e.g) test_hybrid_rcomm_result.json
+**/output/results 아래, 이름을 지정한 형태로 결과값이 반환됨.** <br/>
+e.g) results.csv
 
 <h3>예측 결과</h3>
 
-* icbf <br/>
-  valid LB - song - 0.159576 / tag - 0.340179 = 0.18666645 [61st in leaderboard]
-
-* **[제출] hybrid** <br/>
-  valid LB - song - 0.160008 / tag - 0.411810 = 0.197778 [55th in leaderboard]
-            
 <h2 id="review"> :checkered_flag: 대회후기</h2>
 
-**추후 작성 예정**
+EMNIST 대회에 참가하게 된 계기는, 신경망을 설계하고 예측하는게 경험이 부족했기 때문이다. 그래서 대회를 통한 나의 목표는 높은 점수보다는 pytorch의 사용과 신경망에 대한 폭넓은 이해를 하는 것이다.
+
+이를 위해, 이유한님의 Bangali-AI Competition Baseline 동영상을 통해 pytorch를 활용한 이미지 분류를 먼저 체험했다. 이후, Dacon의 pytorch baseline code를 통해 pytorch에서의 파이프라인 흐름에 대한 이해를 쉽게 할 수 있었다.
+
+대회참가기간 1주 동안 위의 두 가지 참고자료를 통해 먼저 설정했던 목표를 달성했다. 그리고, 대회기간 이후, 이미지 분류를 위한 CNN뿐 아니라 전반적인 신경망에 대한 설명과 구현을 다룬 『3분 딥러닝 파이토치맛』으로 왜 CNN을 위와 같은 형태로 구성하였으며, 우승자 Code에 사용된 ResNet을 구현해볼 수 있었다.
+
+앞으로, 'Private: 4위, Public: 0.95098, ResNet + SSL' 코드를 살펴보며 높은 수준의 예측을 위해 어떤 절차와 방법이 필요한지 살펴보려고 한다.
